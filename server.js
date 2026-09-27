@@ -4,14 +4,12 @@ const app = express();
 
 app.use(express.json());
 
-// Replace below with your connection string from MongoDB Atlas
-const MONGO_URI = 'mongodb+srv://retams333_db_user:v162TvBAz8fiJTEZ@tscanner.stn9dm4.mongodb.net/?appName=TScanner';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://retams333_db_user:v162TvBAz8fiJTEZ@tscanner.stn9dm4.mongodb.net/?appName=TScanner';
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log("Connected to MongoDB Atlas!"))
     .catch(err => console.error("MongoDB connection error:", err));
 
-// Define Vend Schema
 const VendSchema = new mongoose.Schema({
     world: String,
     x: Number,
@@ -25,12 +23,15 @@ const VendSchema = new mongoose.Schema({
 
 const Vend = mongoose.model('Vend', VendSchema);
 
-// 1. POST Endpoint: Upload or update vends when players scan a world
-app.post('/api/upload', async (req, res) => {
+// 1. SUPPORT BOTH POST AND GET FOR UPLOADING (Fixes the 404 error!)
+app.all('/api/upload', async (req, res) => {
     try {
-        const { world, vends } = req.body;
-        if (!world || !vends) {
-            return res.status(400).json({ success: false, error: "Invalid data payload" });
+        // Accept data from either JSON body or URL query parameters
+        const world = req.body.world || req.query.world;
+        const vends = req.body.vends || (req.query.vends ? JSON.parse(req.query.vends) : []);
+        
+        if (!world || !vends || vends.length === 0) {
+            return res.status(400).json({ success: false, error: "No vend data provided" });
         }
         
         for (const v of vends) {
@@ -52,13 +53,13 @@ app.post('/api/upload', async (req, res) => {
     }
 });
 
-// 2. GET Endpoint: Search items globally across all players' synced data
+// 2. GET Search Endpoint
 app.get('/api/search', async (req, res) => {
     try {
         const itemName = req.query.item || "";
         const results = await Vend.find({ 
             name: { $regex: itemName,$options: 'i' } 
-        }).sort({ price: 1 }).limit(50); // Sorted by lowest price first
+        }).sort({ price: 1 }).limit(50);
 
         res.json(results);
     } catch (err) {
