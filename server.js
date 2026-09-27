@@ -24,30 +24,35 @@ const VendSchema = new mongoose.Schema({
 const Vend = mongoose.model('Vend', VendSchema);
 
 // 1. SUPPORT BOTH POST AND GET FOR UPLOADING (Fixes the 404 error!)
+// SUPPORT GET/POST FOR UPLOADING
 app.all('/api/upload', async (req, res) => {
     try {
-        // Accept data from either JSON body or URL query parameters
-        const world = req.body.world || req.query.world;
-        const vends = req.body.vends || (req.query.vends ? JSON.parse(req.query.vends) : []);
-        
-        if (!world || !vends || vends.length === 0) {
-            return res.status(400).json({ success: false, error: "No vend data provided" });
+        // Grab data from either query parameters (GET) or JSON body (POST)
+        const world = req.query.world || (req.body && req.body.world);
+        const x = parseInt(req.query.x || (req.body && req.body.x));
+        const y = parseInt(req.query.y || (req.body && req.body.y));
+        const item_id = parseInt(req.query.id || (req.body && req.body.id));
+        const name = req.query.name || (req.body && req.body.name);
+        const price = parseInt(req.query.price || (req.body && req.body.price));
+        const isRatio = (req.query.isRatio === 'true') || (req.body && req.body.isRatio);
+
+        if (!world || isNaN(x) || isNaN(y)) {
+            return res.status(400).json({ success: false, error: "Missing required vend parameters" });
         }
-        
-        for (const v of vends) {
-            await Vend.findOneAndUpdate(
-                { world: world.toUpperCase(), x: v.x, y: v.y },
-                { 
-                    item_id: v.id, 
-                    name: v.name, 
-                    price: v.price, 
-                    isRatio: v.isRatio, 
-                    updated_at: Date.now() 
-                },
-                { upsert: true, new: true }
-            );
-        }
-        res.status(200).json({ success: true, message: "Synced successfully!" });
+
+        await Vend.findOneAndUpdate(
+            { world: world.toUpperCase(), x: x, y: y },
+            { 
+                item_id: item_id, 
+                name: name, 
+                price: price, 
+                isRatio: isRatio, 
+                updated_at: Date.now() 
+            },
+            { upsert: true, new: true }
+        );
+
+        res.status(200).json({ success: true, message: "Vend saved to MongoDB!" });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
