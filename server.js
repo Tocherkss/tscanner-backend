@@ -5,7 +5,7 @@ const app = express();
 app.use(express.json());
 
 // Replace below with your connection string from MongoDB Atlas
-const MONGO_URI = 'mongodb+srv://retams333_db_user:v162TvBAz8fiJTEZ@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+const MONGO_URI = 'mongodb+srv://<db_username>:v162TvBAz8fiJTEZ@tscanner.stn9dm4.mongodb.net/?appName=TScanner';
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log("Connected to MongoDB Atlas!"))
