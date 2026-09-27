@@ -24,21 +24,10 @@ const VendSchema = new mongoose.Schema({
 const Vend = mongoose.model('Vend', VendSchema);
 
 // Universal GET/POST Upload Route that handles query strings safely
-app.all('/api/upload', async (req, res) => {
+app.post('/api/upload', async (req, res) => {
     try {
         const world = req.query.world || (req.body && req.body.world);
-        let vends = [];
-
-        if (req.query.vends) {
-            try {
-                vends = JSON.parse(decodeURIComponent(req.query.vends));
-            } catch (e) {
-                console.error("JSON Parse Error:", e);
-                vends = [];
-            }
-        } else if (req.body && req.body.vends) {
-            vends = req.body.vends;
-        }
+        const vends = req.body && req.body.vends ? req.body.vends : [];
 
         if (!world || vends.length === 0) {
             return res.status(400).json({ success: false, error: "Missing world or vends data" });
