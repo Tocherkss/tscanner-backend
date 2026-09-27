@@ -27,32 +27,34 @@ const Vend = mongoose.model('Vend', VendSchema);
 // SUPPORT GET/POST FOR UPLOADING
 app.all('/api/upload', async (req, res) => {
     try {
-        // Grab data from either query parameters (GET) or JSON body (POST)
         const world = req.query.world || (req.body && req.body.world);
-        const x = parseInt(req.query.x || (req.body && req.body.x));
-        const y = parseInt(req.query.y || (req.body && req.body.y));
-        const item_id = parseInt(req.query.id || (req.body && req.body.id));
-        const name = req.query.name || (req.body && req.body.name);
-        const price = parseInt(req.query.price || (req.body && req.body.price));
-        const isRatio = (req.query.isRatio === 'true') || (req.body && req.body.isRatio);
+        let vends = [];
 
-        if (!world || isNaN(x) || isNaN(y)) {
-            return res.status(400).json({ success: false, error: "Missing required vend parameters" });
+        if (req.query.vends) {
+            vends = JSON.parse(req.query.vends);
+        } else if (req.body && req.body.vends) {
+            vends = req.body.vends;
         }
 
-        await Vend.findOneAndUpdate(
-            { world: world.toUpperCase(), x: x, y: y },
-            { 
-                item_id: item_id, 
-                name: name, 
-                price: price, 
-                isRatio: isRatio, 
-                updated_at: Date.now() 
-            },
-            { upsert: true, new: true }
-        );
+        if (!world || !vends || vends.length === 0) {
+            return res.status(400).json({ success: false, error: "No vends provided" });
+        }
 
-        res.status(200).json({ success: true, message: "Vend saved to MongoDB!" });
+        for (const v of vends) {
+            await Vend.findOneAndUpdate(
+                { world: world.toUpperCase(), x: v.x, y: v.y },
+                { 
+                    item_id: v.id, 
+                    name: v.name, 
+                    price: v.price, 
+                    isRatio: v.isRatio, 
+                    updated_at: Date.now() 
+                },
+                { upsert: true, new: true }
+            );
+        }
+
+        res.status(200).json({ success: true, message: "Batch synced successfully!" });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
