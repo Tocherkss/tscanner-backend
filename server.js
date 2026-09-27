@@ -4,7 +4,7 @@ const app = express();
 
 app.use(express.json());
 
-const MONGO_URI = process.env.MONGO_URI;
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://retams333_db_user:v162TvBAz8fiJTEZ@tscanner.stn9dm4.mongodb.net/?appName=TScanner"
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log(">>> MONGODB CONNECTED SUCCESSFULLY <<<"))
