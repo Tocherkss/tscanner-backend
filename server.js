@@ -4,11 +4,12 @@ const app = express();
 
 app.use(express.json());
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://retams333_db_user:v162TvBAz8fiJTEZ@tscanner.stn9dm4.mongodb.net/?appName=TScanner';
+// Use Railway environment variable or your connection string directly
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://retams333_db_user:v162TvBAz8fiJTEZ@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log("Connected to MongoDB Atlas successfully!"))
-    .catch(err => console.error("MongoDB connection error:", err));
+    .then(() => console.log("MongoDB Connected Successfully!"))
+    .catch(err => console.error("MongoDB Connection Failed:", err));
 
 const VendSchema = new mongoose.Schema({
     world: String,
@@ -23,7 +24,12 @@ const VendSchema = new mongoose.Schema({
 
 const Vend = mongoose.model('Vend', VendSchema);
 
-// Safe Upload Endpoint (Handles both batch JSON and individual params)
+// Test Route to verify server is alive
+app.get('/', (req, res) => {
+    res.send("Global Vending API is online and running!");
+});
+
+// Upload Route
 app.all('/api/upload', async (req, res) => {
     try {
         const world = req.query.world || (req.body && req.body.world);
@@ -37,18 +43,6 @@ app.all('/api/upload', async (req, res) => {
             }
         } else if (req.body && req.body.vends) {
             vends = req.body.vends;
-        }
-
-        // Fallback for single item query
-        if (vends.length === 0 && req.query.name) {
-            vends = [{
-                x: parseInt(req.query.x) || 0,
-                y: parseInt(req.query.y) || 0,
-                id: parseInt(req.query.id) || 0,
-                name: req.query.name,
-                price: parseInt(req.query.price) || 0,
-                isRatio: req.query.isRatio === 'true'
-            }];
         }
 
         if (!world || vends.length === 0) {
@@ -71,12 +65,11 @@ app.all('/api/upload', async (req, res) => {
 
         res.status(200).json({ success: true, count: vends.length });
     } catch (err) {
-        console.error("Upload Error:", err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
-// Safe Search Endpoint (Prevents 500 crashes)
+// Search Route
 app.get('/api/search', async (req, res) => {
     try {
         const itemName = req.query.item || "";
@@ -86,10 +79,9 @@ app.get('/api/search', async (req, res) => {
 
         res.json(results);
     } catch (err) {
-        console.error("Search Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Scanner API running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
