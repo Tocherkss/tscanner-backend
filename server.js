@@ -4,12 +4,11 @@ const app = express();
 
 app.use(express.json());
 
-// Use Railway environment variable or your connection string directly
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://retams333_db_user:v162TvBAz8fiJTEZ@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+const MONGO_URI = process.env.MONGO_URI;
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log("MongoDB Connected Successfully!"))
-    .catch(err => console.error("MongoDB Connection Failed:", err));
+    .then(() => console.log(">>> MONGODB CONNECTED SUCCESSFULLY <<<"))
+    .catch(err => console.error(">>> MONGODB CONNECTION ERROR:", err));
 
 const VendSchema = new mongoose.Schema({
     world: String,
@@ -24,17 +23,22 @@ const VendSchema = new mongoose.Schema({
 
 const Vend = mongoose.model('Vend', VendSchema);
 
-// Test Route to verify server is alive
-app.get('/', (req, res) => {
-    res.send("Global Vending API is online and running!");
-});
-
-// Upload Route
-// Robust JSON Body Upload Route
-app.post('/api/upload', async (req, res) => {
+// Universal GET/POST Upload Route that handles query strings safely
+app.all('/api/upload', async (req, res) => {
     try {
-        const world = req.body.world;
-        const vends = req.body.vends || [];
+        const world = req.query.world || (req.body && req.body.world);
+        let vends = [];
+
+        if (req.query.vends) {
+            try {
+                vends = JSON.parse(decodeURIComponent(req.query.vends));
+            } catch (e) {
+                console.error("JSON Parse Error:", e);
+                vends = [];
+            }
+        } else if (req.body && req.body.vends) {
+            vends = req.body.vends;
+        }
 
         if (!world || vends.length === 0) {
             return res.status(400).json({ success: false, error: "Missing world or vends data" });
@@ -54,26 +58,30 @@ app.post('/api/upload', async (req, res) => {
             );
         }
 
-        console.log(`Successfully saved ${vends.length} vends for world: ${world}`);
+        console.log(`>>> SUCCESS: Saved ${vends.length} vends for world [${world}]`);
         res.status(200).json({ success: true, count: vends.length });
     } catch (err) {
-        console.error("Upload Error:", err);
+        console.error(">>> UPLOAD CRASH:", err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
-// Search Route
+
+// Crash-proof Search Route
 app.get('/api/search', async (req, res) => {
     try {
         const itemName = req.query.item || "";
+        console.log(`>>> SEARCH REQUEST FOR: "${itemName}"`);
+        
         const results = await Vend.find({ 
             name: { $regex: itemName,$options: 'i' } 
         }).sort({ price: 1 }).limit(50);
 
         res.json(results);
     } catch (err) {
+        console.error(">>> SEARCH CRASH:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`>>> SERVER RUNNING ON PORT ${PORT}`));
