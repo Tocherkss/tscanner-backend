@@ -7,7 +7,7 @@ app.use(express.json());
 const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://retams333_db_user:v162TvBAz8fiJTEZ@tscanner.stn9dm4.mongodb.net/?appName=TScanner';
 
 mongoose.connect(MONGO_URI)
-    .then(() => console.log("Connected to MongoDB Atlas!"))
+    .then(() => console.log("Connected to MongoDB Atlas successfully!"))
     .catch(err => console.error("MongoDB connection error:", err));
 
 const VendSchema = new mongoose.Schema({
@@ -23,21 +23,36 @@ const VendSchema = new mongoose.Schema({
 
 const Vend = mongoose.model('Vend', VendSchema);
 
-// 1. SUPPORT BOTH POST AND GET FOR UPLOADING (Fixes the 404 error!)
-// SUPPORT GET/POST FOR UPLOADING
+// Safe Upload Endpoint (Handles both batch JSON and individual params)
 app.all('/api/upload', async (req, res) => {
     try {
         const world = req.query.world || (req.body && req.body.world);
         let vends = [];
 
         if (req.query.vends) {
-            vends = JSON.parse(req.query.vends);
+            try {
+                vends = JSON.parse(decodeURIComponent(req.query.vends));
+            } catch (e) {
+                vends = [];
+            }
         } else if (req.body && req.body.vends) {
             vends = req.body.vends;
         }
 
-        if (!world || !vends || vends.length === 0) {
-            return res.status(400).json({ success: false, error: "No vends provided" });
+        // Fallback for single item query
+        if (vends.length === 0 && req.query.name) {
+            vends = [{
+                x: parseInt(req.query.x) || 0,
+                y: parseInt(req.query.y) || 0,
+                id: parseInt(req.query.id) || 0,
+                name: req.query.name,
+                price: parseInt(req.query.price) || 0,
+                isRatio: req.query.isRatio === 'true'
+            }];
+        }
+
+        if (!world || vends.length === 0) {
+            return res.status(400).json({ success: false, error: "Missing world or vends data" });
         }
 
         for (const v of vends) {
@@ -54,13 +69,14 @@ app.all('/api/upload', async (req, res) => {
             );
         }
 
-        res.status(200).json({ success: true, message: "Batch synced successfully!" });
+        res.status(200).json({ success: true, count: vends.length });
     } catch (err) {
+        console.error("Upload Error:", err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
-// 2. GET Search Endpoint
+// Safe Search Endpoint (Prevents 500 crashes)
 app.get('/api/search', async (req, res) => {
     try {
         const itemName = req.query.item || "";
@@ -70,6 +86,7 @@ app.get('/api/search', async (req, res) => {
 
         res.json(results);
     } catch (err) {
+        console.error("Search Error:", err);
         res.status(500).json({ error: err.message });
     }
 });
