@@ -30,20 +30,11 @@ app.get('/', (req, res) => {
 });
 
 // Upload Route
-app.all('/api/upload', async (req, res) => {
+// Robust JSON Body Upload Route
+app.post('/api/upload', async (req, res) => {
     try {
-        const world = req.query.world || (req.body && req.body.world);
-        let vends = [];
-
-        if (req.query.vends) {
-            try {
-                vends = JSON.parse(decodeURIComponent(req.query.vends));
-            } catch (e) {
-                vends = [];
-            }
-        } else if (req.body && req.body.vends) {
-            vends = req.body.vends;
-        }
+        const world = req.body.world;
+        const vends = req.body.vends || [];
 
         if (!world || vends.length === 0) {
             return res.status(400).json({ success: false, error: "Missing world or vends data" });
@@ -63,12 +54,13 @@ app.all('/api/upload', async (req, res) => {
             );
         }
 
+        console.log(`Successfully saved ${vends.length} vends for world: ${world}`);
         res.status(200).json({ success: true, count: vends.length });
     } catch (err) {
+        console.error("Upload Error:", err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
-
 // Search Route
 app.get('/api/search', async (req, res) => {
     try {
