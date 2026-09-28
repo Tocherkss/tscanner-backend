@@ -91,10 +91,10 @@ app.get('/api/search', async (req, res) => {
 });
 
 // ==========================================
-// QUEST API ROUTES (With 4-Hour Cooldown)
+// QUEST API ROUTES (With True 4-Hour Sliding Cooldown)
 // ==========================================
 
-// 1. Bot adds a world, but ignores duplicates if added within the last 4 hours
+// 1. Bot adds a world, respects the 4-hour cooldown window
 app.post('/api/quest/add', async (req, res) => {
     try {
         const { world } = req.body;
@@ -103,16 +103,21 @@ app.post('/api/quest/add', async (req, res) => {
         const cleanWorld = world.toUpperCase();
         const fourHoursAgo = new Date(Date.now() - (4 * 60 * 60 * 1000));
 
-        // Check if this world already exists in the active queue OR was created less than 4 hours ago
+        // Check if this world exists and was created/scanned less than 4 hours ago
         const existing = await Quest.findOne({ world: cleanWorld });
         
         if (existing) {
-            // If it's already in the queue or scanned within 4 hours, ignore it
-            console.log(`>>> IGNORED DUPLICATE WORLD: [${cleanWorld}] (Already active or scanned recently)`);
-            return res.json({ success: true, skipped: true });
+            if (existing.created_at > fourHoursAgo) {
+                // If it's still within the 4-hour lock window, ignore it
+                console.log(`>>> IGNORED DUPLICATE WORLD: [${cleanWorld}] (Scanned within the last 4 hours)`);
+                return res.json({ success: true, skipped: true });
+            } else {
+                // If older than 4 hours, remove the old record so it can be re-queued fresh
+                await Quest.deleteOne({ world: cleanWorld });
+            }
         }
 
-        // Create the quest if it's brand new / outside the 4-hour window
+        // Create the quest fresh
         await Quest.create({ world: cleanWorld, created_at: new Date() });
         console.log(`>>> QUEST ADDED TO QUEUE: [${cleanWorld}]`);
         res.json({ success: true, skipped: false });
@@ -132,7 +137,7 @@ app.get('/api/quest/list', async (req, res) => {
     }
 });
 
-// 3. Complete quest (removes it from the active queue so the 4-hour block starts tracking from completion/creation)
+// 3. Complete quest
 app.post('/api/quest/complete', async (req, res) => {
     try {
         const { world } = req.body;
