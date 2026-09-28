@@ -59,7 +59,6 @@ app.get('/api/upload', async (req, res) => {
                         name: v.name, 
                         price: v.price, 
                         isRatio: v.isRatio, 
-                        // Accepts the exact local scan timestamp from the Lua script, falling back to server time if needed
                         updated_at: v.time ? new Date(v.time * 1000) : Date.now() 
                     }
                 },
@@ -92,38 +91,48 @@ app.get('/api/search', async (req, res) => {
 });
 
 // ==========================================
-// QUEST API ROUTES
+// QUEST API ROUTES (With 4-Hour Cooldown)
 // ==========================================
 
-// 1. Bot adds a quest world extracted from Discord
+// 1. Bot adds a world, but ignores duplicates if added within the last 4 hours
 app.post('/api/quest/add', async (req, res) => {
     try {
         const { world } = req.body;
         if (!world) return res.status(400).json({ error: "Missing world" });
-        await Quest.updateOne(
-            { world: world.toUpperCase() }, 
-            { $set: { world: world.toUpperCase() } }, 
-            { upsert: true }
-        );
-        console.log(`>>> QUEST ADDED: [${world.toUpperCase()}]`);
-        res.json({ success: true });
+        
+        const cleanWorld = world.toUpperCase();
+        const fourHoursAgo = new Date(Date.now() - (4 * 60 * 60 * 1000));
+
+        // Check if this world already exists in the active queue OR was created less than 4 hours ago
+        const existing = await Quest.findOne({ world: cleanWorld });
+        
+        if (existing) {
+            // If it's already in the queue or scanned within 4 hours, ignore it
+            console.log(`>>> IGNORED DUPLICATE WORLD: [${cleanWorld}] (Already active or scanned recently)`);
+            return res.json({ success: true, skipped: true });
+        }
+
+        // Create the quest if it's brand new / outside the 4-hour window
+        await Quest.create({ world: cleanWorld, created_at: new Date() });
+        console.log(`>>> QUEST ADDED TO QUEUE: [${cleanWorld}]`);
+        res.json({ success: true, skipped: false });
     } catch (err) {
         console.error(">>> QUEST ADD ERROR:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// 2. Free-tier Lua script fetches current active quest worlds for the /quest menu
+// 2. Fetch active quest queue
 app.get('/api/quest/list', async (req, res) => {
     try {
-        const quests = await Quest.find().sort({ created_at: -1 }).limit(10);
+        const quests = await Quest.find().sort({ created_at: 1 }).limit(10);
         res.json(quests);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// 3. Lua script completes a quest after scanning the target world
+// 3. Complete quest (removes it from the active queue so the 4-hour block starts tracking from completion/creation)
 app.post('/api/quest/complete', async (req, res) => {
     try {
         const { world } = req.body;
