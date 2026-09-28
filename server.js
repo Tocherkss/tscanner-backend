@@ -1,6 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const app = express(); // <--- THIS WAS MISSING AND CAUSED THE CRASH
+const app = express();
 
 app.use(express.json());
 
@@ -23,28 +23,16 @@ const VendSchema = new mongoose.Schema({
 
 const Vend = mongoose.model('Vend', VendSchema);
 
-// High-Speed Bulk Write Upload Route
-app.all('/api/upload', async (req, res) => {
+// High-Speed POST Bulk Write Upload Route (Immune to 431 errors)
+app.post('/api/upload', async (req, res) => {
     try {
-        const world = req.query.world || (req.body && req.body.world);
-        let vends = [];
-
-        if (req.query.vends) {
-            try {
-                vends = JSON.parse(decodeURIComponent(req.query.vends));
-            } catch (e) {
-                console.error("JSON Parse Error:", e);
-                vends = [];
-            }
-        } else if (req.body && req.body.vends) {
-            vends = req.body.vends;
-        }
+        const world = req.body.world;
+        const vends = req.body.vends || [];
 
         if (!world || vends.length === 0) {
             return res.status(400).json({ success: false, error: "Missing world or vends data" });
         }
 
-        // Map vends into fast bulk operations
         const bulkOps = vends.map(v => ({
             updateOne: {
                 filter: { world: world.toUpperCase(), x: v.x, y: v.y },
@@ -61,10 +49,9 @@ app.all('/api/upload', async (req, res) => {
             }
         }));
 
-        // Execute all database writes simultaneously 
         await Vend.bulkWrite(bulkOps);
 
-        console.log(`>>> SUCCESS (BULK): Saved ${vends.length} vends for world [${world}]`);
+        console.log(`>>> SUCCESS (POST BULK): Saved ${vends.length} vends for world [${world}]`);
         res.status(200).json({ success: true, count: vends.length });
     } catch (err) {
         console.error(">>> UPLOAD CRASH:", err);
