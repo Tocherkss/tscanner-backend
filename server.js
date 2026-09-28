@@ -23,7 +23,7 @@ const VendSchema = new mongoose.Schema({
 
 const Vend = mongoose.model('Vend', VendSchema);
 
-// GET Upload Route with Safe Bulk Write
+// GET Upload Route with Bulk Write & Client Timestamp Support
 app.get('/api/upload', async (req, res) => {
     try {
         const world = req.query.world;
@@ -50,7 +50,8 @@ app.get('/api/upload', async (req, res) => {
                         name: v.name, 
                         price: v.price, 
                         isRatio: v.isRatio, 
-                        updated_at: Date.now() 
+                        // Accepts the exact local scan timestamp from the Lua script, falling back to server time if needed
+                        updated_at: v.time ? new Date(v.time * 1000) : Date.now() 
                     }
                 },
                 upsert: true
