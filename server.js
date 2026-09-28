@@ -59,7 +59,7 @@ app.get('/api/upload', async (req, res) => {
                         name: v.name, 
                         price: v.price, 
                         isRatio: v.isRatio, 
-                        -- Accepts the exact local scan timestamp from the Lua script, falling back to server time if needed
+                        // Accepts the exact local scan timestamp from the Lua script, falling back to server time if needed
                         updated_at: v.time ? new Date(v.time * 1000) : Date.now() 
                     }
                 },
@@ -92,7 +92,7 @@ app.get('/api/search', async (req, res) => {
 });
 
 // ==========================================
-// QUEST API ROUTES (Integrated)
+// QUEST API ROUTES
 // ==========================================
 
 // 1. Bot adds a quest world extracted from Discord
@@ -123,7 +123,7 @@ app.get('/api/quest/list', async (req, res) => {
     }
 });
 
-// 3. Lua script completes a quest after scanning the target world (clears it from queue)
+// 3. Lua script completes a quest after scanning the target world
 app.post('/api/quest/complete', async (req, res) => {
     try {
         const { world } = req.body;
