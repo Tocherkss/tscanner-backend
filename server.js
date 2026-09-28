@@ -23,6 +23,15 @@ const VendSchema = new mongoose.Schema({
 
 const Vend = mongoose.model('Vend', VendSchema);
 
+// ==========================================
+// QUEST SCHEMA & MODEL
+// ==========================================
+const QuestSchema = new mongoose.Schema({
+    world: { type: String, unique: true },
+    created_at: { type: Date, default: Date.now }
+});
+const Quest = mongoose.model('Quest', QuestSchema);
+
 // GET Upload Route with Bulk Write & Client Timestamp Support
 app.get('/api/upload', async (req, res) => {
     try {
@@ -50,7 +59,7 @@ app.get('/api/upload', async (req, res) => {
                         name: v.name, 
                         price: v.price, 
                         isRatio: v.isRatio, 
-                        // Accepts the exact local scan timestamp from the Lua script, falling back to server time if needed
+                        -- Accepts the exact local scan timestamp from the Lua script, falling back to server time if needed
                         updated_at: v.time ? new Date(v.time * 1000) : Date.now() 
                     }
                 },
@@ -78,6 +87,53 @@ app.get('/api/search', async (req, res) => {
 
         res.json(results);
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ==========================================
+// QUEST API ROUTES (Integrated)
+// ==========================================
+
+// 1. Bot adds a quest world extracted from Discord
+app.post('/api/quest/add', async (req, res) => {
+    try {
+        const { world } = req.body;
+        if (!world) return res.status(400).json({ error: "Missing world" });
+        await Quest.updateOne(
+            { world: world.toUpperCase() }, 
+            { $set: { world: world.toUpperCase() } }, 
+            { upsert: true }
+        );
+        console.log(`>>> QUEST ADDED: [${world.toUpperCase()}]`);
+        res.json({ success: true });
+    } catch (err) {
+        console.error(">>> QUEST ADD ERROR:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. Free-tier Lua script fetches current active quest worlds for the /quest menu
+app.get('/api/quest/list', async (req, res) => {
+    try {
+        const quests = await Quest.find().sort({ created_at: -1 }).limit(10);
+        res.json(quests);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3. Lua script completes a quest after scanning the target world (clears it from queue)
+app.post('/api/quest/complete', async (req, res) => {
+    try {
+        const { world } = req.body;
+        if (world) {
+            await Quest.deleteOne({ world: world.toUpperCase() });
+            console.log(`>>> QUEST COMPLETED & CLEARED: [${world.toUpperCase()}]`);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error(">>> QUEST COMPLETE ERROR:", err);
         res.status(500).json({ error: err.message });
     }
 });
