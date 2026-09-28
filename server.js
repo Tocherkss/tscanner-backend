@@ -23,16 +23,13 @@ const VendSchema = new mongoose.Schema({
 
 const Vend = mongoose.model('Vend', VendSchema);
 
-// ==========================================
-// QUEST SCHEMA & MODEL
-// ==========================================
 const QuestSchema = new mongoose.Schema({
     world: { type: String, unique: true },
     created_at: { type: Date, default: Date.now }
 });
 const Quest = mongoose.model('Quest', QuestSchema);
 
-// GET Upload Route with Bulk Write & Client Timestamp Support
+// GET Upload Route with Bulk Write
 app.get('/api/upload', async (req, res) => {
     try {
         const world = req.query.world;
@@ -67,16 +64,12 @@ app.get('/api/upload', async (req, res) => {
         }));
 
         await Vend.bulkWrite(bulkOps);
-
-        console.log(`>>> SUCCESS (GET BULK): Saved ${vends.length} vends for world [${world}]`);
         res.status(200).json({ success: true, count: vends.length });
     } catch (err) {
-        console.error(">>> UPLOAD CRASH:", err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
-// Crash-proof Search Route
 app.get('/api/search', async (req, res) => {
     try {
         const itemName = req.query.item || "";
@@ -91,10 +84,10 @@ app.get('/api/search', async (req, res) => {
 });
 
 // ==========================================
-// QUEST API ROUTES (With True 4-Hour Sliding Cooldown)
+// QUEST API ROUTES (With 4-Hour Cooldown)
 // ==========================================
 
-// 1. Bot adds a world, respects the 4-hour cooldown window
+// 1. Add single world with 4-hour cooldown check
 app.post('/api/quest/add', async (req, res) => {
     try {
         const { world } = req.body;
@@ -103,31 +96,59 @@ app.post('/api/quest/add', async (req, res) => {
         const cleanWorld = world.toUpperCase();
         const fourHoursAgo = new Date(Date.now() - (4 * 60 * 60 * 1000));
 
-        // Check if this world exists and was created/scanned less than 4 hours ago
         const existing = await Quest.findOne({ world: cleanWorld });
         
         if (existing) {
             if (existing.created_at > fourHoursAgo) {
-                // If it's still within the 4-hour lock window, ignore it
-                console.log(`>>> IGNORED DUPLICATE WORLD: [${cleanWorld}] (Scanned within the last 4 hours)`);
                 return res.json({ success: true, skipped: true });
             } else {
-                // If older than 4 hours, remove the old record so it can be re-queued fresh
                 await Quest.deleteOne({ world: cleanWorld });
             }
         }
 
-        // Create the quest fresh
         await Quest.create({ world: cleanWorld, created_at: new Date() });
-        console.log(`>>> QUEST ADDED TO QUEUE: [${cleanWorld}]`);
         res.json({ success: true, skipped: false });
     } catch (err) {
-        console.error(">>> QUEST ADD ERROR:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// 2. Fetch active quest queue
+// 2. Bulk import route for chat logs
+app.post('/api/quest/bulk-import', async (req, res) => {
+    try {
+        const { rawText } = req.body;
+        if (!rawText) return res.status(400).json({ error: "No text provided" });
+
+        const matches = [...rawText.matchAll(/\b(?:at|go)\s+([a-zA-Z0-9]+)\b/gi)];
+        let addedCount = 0;
+        let skippedCount = 0;
+
+        const fourHoursAgo = new Date(Date.now() - (4 * 60 * 60 * 1000));
+
+        for (const match of matches) {
+            const cleanWorld = match[1].toUpperCase();
+            
+            const existing = await Quest.findOne({ world: cleanWorld });
+            if (existing) {
+                if (existing.created_at > fourHoursAgo) {
+                    skippedCount++;
+                    continue;
+                } else {
+                    await Quest.deleteOne({ world: cleanWorld });
+                }
+            }
+
+            await Quest.create({ world: cleanWorld, created_at: new Date() });
+            addedCount++;
+        }
+
+        console.log(`>>> BULK IMPORT: Added ${addedCount} worlds, Skipped ${skippedCount} duplicates.`);
+        res.json({ success: true, added: addedCount, skipped: skippedCount });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/quest/list', async (req, res) => {
     try {
         const quests = await Quest.find().sort({ created_at: 1 }).limit(10);
@@ -137,17 +158,14 @@ app.get('/api/quest/list', async (req, res) => {
     }
 });
 
-// 3. Complete quest
 app.post('/api/quest/complete', async (req, res) => {
     try {
         const { world } = req.body;
         if (world) {
             await Quest.deleteOne({ world: world.toUpperCase() });
-            console.log(`>>> QUEST COMPLETED & CLEARED: [${world.toUpperCase()}]`);
         }
         res.json({ success: true });
     } catch (err) {
-        console.error(">>> QUEST COMPLETE ERROR:", err);
         res.status(500).json({ error: err.message });
     }
 });
