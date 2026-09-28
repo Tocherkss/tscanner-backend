@@ -23,11 +23,19 @@ const VendSchema = new mongoose.Schema({
 
 const Vend = mongoose.model('Vend', VendSchema);
 
-// High-Speed POST Bulk Write Upload Route (Immune to 431 errors)
-app.post('/api/upload', async (req, res) => {
+// GET Upload Route with Safe Bulk Write
+app.get('/api/upload', async (req, res) => {
     try {
-        const world = req.body.world;
-        const vends = req.body.vends || [];
+        const world = req.query.world;
+        let vends = [];
+
+        if (req.query.vends) {
+            try {
+                vends = JSON.parse(decodeURIComponent(req.query.vends));
+            } catch (e) {
+                vends = [];
+            }
+        }
 
         if (!world || vends.length === 0) {
             return res.status(400).json({ success: false, error: "Missing world or vends data" });
@@ -51,7 +59,7 @@ app.post('/api/upload', async (req, res) => {
 
         await Vend.bulkWrite(bulkOps);
 
-        console.log(`>>> SUCCESS (POST BULK): Saved ${vends.length} vends for world [${world}]`);
+        console.log(`>>> SUCCESS (GET BULK): Saved ${vends.length} vends for world [${world}]`);
         res.status(200).json({ success: true, count: vends.length });
     } catch (err) {
         console.error(">>> UPLOAD CRASH:", err);
@@ -63,15 +71,12 @@ app.post('/api/upload', async (req, res) => {
 app.get('/api/search', async (req, res) => {
     try {
         const itemName = req.query.item || "";
-        console.log(`>>> SEARCH REQUEST FOR: "${itemName}"`);
-        
         const results = await Vend.find({ 
             name: { $regex: itemName,$options: 'i' } 
         }).sort({ price: 1 }).limit(50);
 
         res.json(results);
     } catch (err) {
-        console.error(">>> SEARCH CRASH:", err);
         res.status(500).json({ error: err.message });
     }
 });
