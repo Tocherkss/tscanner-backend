@@ -29,7 +29,7 @@ const QuestSchema = new mongoose.Schema({
 });
 const Quest = mongoose.model('Quest', QuestSchema);
 
-// GET Upload Route with Bulk Write & Log
+// GET Upload Route with Bulk Write & Client Timestamp Support
 app.get('/api/upload', async (req, res) => {
     try {
         const world = req.query.world;
@@ -64,6 +64,7 @@ app.get('/api/upload', async (req, res) => {
         }));
 
         await Vend.bulkWrite(bulkOps);
+
         console.log(`>>> SUCCESS (GET BULK): Saved ${vends.length} vends for world [${world}]`);
         res.status(200).json({ success: true, count: vends.length });
     } catch (err) {
@@ -72,6 +73,7 @@ app.get('/api/upload', async (req, res) => {
     }
 });
 
+// Crash-proof Search Route
 app.get('/api/search', async (req, res) => {
     try {
         const itemName = req.query.item || "";
