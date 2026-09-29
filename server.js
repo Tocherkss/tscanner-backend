@@ -1,4 +1,3 @@
-const loaderRouter = require('./loader');
 const express = require('express');
 const mongoose = require('mongoose');
 const app = express();
@@ -29,8 +28,6 @@ const QuestSchema = new mongoose.Schema({
     created_at: { type: Date, default: Date.now }
 });
 const Quest = mongoose.model('Quest', QuestSchema);
-
-app.use(loaderRouter);
 
 // GET Upload Route with Bulk Write & Client Timestamp Support
 app.get('/api/upload', async (req, res) => {
