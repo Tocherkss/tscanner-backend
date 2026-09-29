@@ -126,9 +126,10 @@ app.get('/api/quest/list', async (req, res) => {
     }
 });
 
-app.post('/api/quest/complete', async (req, res) => {
+// CHANGED: Now uses app.all to accept GET requests to bypass executor POST bugs
+app.all('/api/quest/complete', async (req, res) => {
     try {
-        const { world } = req.body;
+        const world = req.body.world || req.query.world;
         if (world) {
             const upperWorld = world.toUpperCase();
             await Quest.deleteOne({ world: upperWorld });
